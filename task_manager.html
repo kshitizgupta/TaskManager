@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+  <meta charset="UTF-8">
+  <title>
+    Task Manager
+  </title>
+  <!-- Latest compiled and minified CSS -->
+  <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+  <link rel="stylesheet" href="http://v4-alpha.getbootstrap.com/dist/css/bootstrap.min.css">
+  <link href='https://fonts.googleapis.com/css?family=Slabo+27px' rel='stylesheet' type='text/css'>
+
+  <!-- jQuery library -->
+  <!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>-->
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+
+  <!-- Latest compiled JavaScript -->
+  <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+
+
+  <style>
+    body {
+      font-family: 'Slabo 27px', serif;
+    }
+
+    div.list_card {
+      width: 150px;
+      height: 100px;
+      margin: 16px;
+      padding: 16px;
+    }
+
+    div.list_item {
+      border: groove;
+    }
+    .clear_fix{
+      padding-bottom: 50px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <input id="list_name" type="text" placeholder="Enter List Name">
+    <button id="add_list" type="BUTTON" onclick="doAction('addList')">Enter</button>
+    <div class="clear_fix"></div>
+    <div class="list_container row">
+    </div>
+  </div>
+
+  <script>
+    function allowDrop(ev) {
+      ev.preventDefault();
+    }
+
+    function drag(ev) {
+      var from = $(ev.target).find('#move').attr('from');
+      var taskIndex = $(ev.target).find('#move').attr('taskIndex');
+      console.log("drag task", taskIndex);
+      console.log("drag from", from);
+      ev.dataTransfer.setData("from", from);
+      ev.dataTransfer.setData("taskIndex", taskIndex);
+    }
+
+    function drop(ev) {
+      console.log("DROP called");
+      ev.preventDefault();
+      var from = ev.dataTransfer.getData("from");
+      var taskIndex = ev.dataTransfer.getData("taskIndex");
+      var to = $(ev.target).attr('listindex');
+      if(!to) {
+        to = $(ev.target).parents('.list_item').attr('listindex');
+      }
+      console.log("In drop second to = ", to);
+      console.log("In drop = ", ev.target);
+      main.moveTask(from, to, taskIndex);
+    }
+
+    /******CONSTANTS******/
+    //DEFAULTS
+    var TASK_DEFAULT_NAME = "TASK XYZ";
+    var LIST_DEFAULT_NAME = "LIST XYZ";
+
+    //STATUS
+    var STATUS_TODO = 'TODO';
+    var STATUS_DONE = 'DONE';
+    var STATUS_IN_PROGRESS = 'IN_PROGRESS';
+
+    //ACTIONS
+    var ACTION_ADD_LIST = "addList";
+    var ACTION_DELETE_LIST = "deleteList";
+    var ACTION_ADD_TASK = "addTask";
+    var ACTION_EDIT_TASK = "editTask";
+    var ACTION_MOVE_TASK = "moveTask";
+    var ACTION_DELETE_TASK = "deleteTask";
+
+    /******APP Objects******/
+    var listArr = [];
+    var main = {
+      listArr: listArr
+    };
+
+    /**
+     * Adds new Lists to listArr
+     */
+    main.addList = function () {
+      var $list_name = $('#list_name');
+      var listName = $list_name.val();
+      $list_name.val('');
+      var list = new List(listName);
+      var data = '<div class="list_item col-md-3" id="list_' + (listArr.length) + '" listIndex="' + listArr.length + '" ondragover="allowDrop(event)" ondrop="drop(event)"">' +
+          '<p>' + list.getName() + '</p>' +
+          '<div class="task_items"></div>' +
+          '<input id="add_task_to_list" type="text" placeholder="Enter Task Name">' +
+          '<button type="BUTTON" onclick="doAction(\'addTask\',' + listArr.length + ')">Add Task</button>' +
+          '</div>';
+      $('div.container').append(data);
+      listArr.push(list);
+      this.displayList();
+    };
+
+    /**
+     * Adds new Task to List with given id
+     * @param listId
+     */
+    main.addTask = function (listId) {
+      var index = listId;
+      var $new_task = $('#list_' + listId + ' #add_task_to_list');
+      var taskName = $new_task.val();
+      var task = new Task(taskName);
+      listArr[index].addTask(task);
+      $new_task.val('');
+      this.displayList();
+    };
+
+    /**
+     * Edits a task of list
+     * @param listIndex
+     * @param taskIndex
+     */
+    editTask = function (listIndex, taskIndex) {
+      var modal_edit_task_id = '#' + 'modal_edit_task_' + listIndex + '_' + taskIndex;
+      var newName = $(modal_edit_task_id).find('#task_new_name').val();
+      listArr[listIndex].getTask(taskIndex).setName(newName);
+      $('.modal-backdrop.fade.in').remove();
+      main.displayList();
+    };
+
+    /**
+     * Edits a task of list
+     * @param listIndex
+     * @param taskIndex
+     */
+    main.moveTask = function (fromIndex, toIndex, taskIndex) {
+      console.log("fromIndex = ", fromIndex);
+      console.log("toIndex = ", toIndex);
+      console.log("taskIndex = ", taskIndex);
+      if(!fromIndex || !toIndex || !taskIndex) return;
+      var task = listArr[fromIndex].getTask(taskIndex);
+      listArr[fromIndex].deleteTask(taskIndex);
+      listArr[toIndex].addTask(task);
+      main.displayList();
+    };
+
+    /**
+     * Deletes a task of a list
+     * @param listIndex index of list in listArr
+     * @param taskIndex index of task in taskArr of a list
+     */
+    deleteTask = function (listIndex, taskIndex) {
+      listArr[listIndex].deleteTask(taskIndex);
+      main.displayList();
+    };
+
+    /**
+     * Displays the lists
+     */
+    main.displayList = function () {
+      for (var i = 0; i < listArr.length; i++) {
+        var $currList = $('#list_' + i);
+        var currList = listArr[i];
+        $currList.find('.task_items').html('');
+        for (var j = 0; j < currList.taskArr.length; j++) {
+          var currTask = currList.taskArr[j];
+
+          //Constructing params list to send to doAction fn for editTask
+          //var editTaskParams = "{\"listIndex\":" + i + "," + '\"taskIndex\":' + j + "}";
+          var editTaskParams = JSON.stringify({listIndex: i, taskIndex: j});
+
+          //Html for modal window which provides an interface of editing the list item i.e. a task
+          var modal_html = '<div id="modal_edit_task_' + i + '_' + j + '" class="modal fade" role="dialog">' +
+              '<div class="modal-dialog">' +
+              '<div class="modal-content">' +
+              '<div class="modal-body">' +
+              '<input id="task_new_name" type="text" value="' + currTask.getName() + '"></input>' +
+              '</div>' +
+              '<div class="modal-footer">' +
+                //"<button type=\"button\" class=\"btn btn-info btn-sm\" data-dismiss=\"modal\"  onclick=\"doAction('" + "editTask" + "'+ '" + editTaskParams + "')\";>Save</button>" +
+              '<button type="button" class="btn btn-info btn-sm" data-dismiss="modal"  onclick="editTask(' + i + ',' + j + ')">Save</button>' +
+              '<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>' +
+              '</div>' +
+              '</div>' +
+              '</div>' +
+              '</div>';
+
+          var task_html = '<div class="task card card-inverse card-success text-xs-center" listindex="'+i+'" draggable="true" ondragstart="drag(event)">' +
+              '<p><b>' + currTask.getName() + '</b></p>' +
+              '<p><b>Status: </b>' + currTask.getStatus() + '</p>' +
+              '<p>Created on ' + currTask.getCreateDate() + '</p>' +
+//              modal_html +
+              '<button id="edit" class="btn btn-info btn-sm" data-toggle="modal" data-target="#modal_edit_task_' + i + '_' + j + '">Edit</button>' +
+              '<div id="move" class="hidden" from="' + i + '" taskIndex="' + j + '" class="btn btn-info btn-sm">Move</div>' +
+              '<button id="delete" class="btn btn-info btn-sm" onclick="deleteTask(' + i + ',' + j + ')" ">Delete</button>' +
+              '</div>' +
+              modal_html;
+          $currList.find('.task_items').append(task_html);
+        }
+      }
+    };
+
+    /**
+     * This fn acts as controller and decides which fn of main object
+     * to call as per the action requested
+     * @param action
+     * @param options
+     */
+    function doAction(action, options) {
+      switch (action) {
+        case ACTION_ADD_LIST:
+          main.addList();
+          break;
+        case ACTION_ADD_TASK:
+          var listIndex = options;
+          main.addTask(listIndex);
+          break;
+        case ACTION_EDIT_TASK:
+          var data = JSON.parse(options);
+          main.editTask(data.listIndex, data.taskIndex);
+          break;
+        case ACTION_MOVE_TASK:
+          var data = JSON.parse(options);
+          main.editTask(data.fromIndex, data.toIndex);
+          break;
+        default:
+      }
+    }
+
+    //TASK CLASS
+    var Task = function (name, dueDate, status) {
+      this.name = (name && name != '' ? name : null) || TASK_DEFAULT_NAME;
+      this.dueDate = dueDate || null;
+      var date = new Date();
+      this.createDate = date.getDate() + '/' + date.getMonth() + '/' + date.getFullYear();
+      this.status = status || STATUS_TODO;
+    };
+
+    Task.prototype.verifyTask = function () {
+      //verify the task
+      return true;
+    };
+
+    Task.prototype.getName = function () {
+      return this.name;
+    };
+
+    Task.prototype.setName = function (name) {
+      this.name = name;
+    };
+
+    Task.prototype.setStatus = function (status) {
+      this.status = status;
+    };
+
+    Task.prototype.getStatus = function () {
+      return this.status;
+    };
+
+    Task.prototype.getCreateDate = function () {
+      return this.createDate;
+    };
+
+    Task.prototype.getDueDate = function () {
+      return this.dueDate;
+    };
+
+    //LIST CLASS
+    var List = function (name) {
+      this.name = (name && name != '' ? name : null) || LIST_DEFAULT_NAME;
+      this.taskArr = [];
+    };
+
+    List.prototype.getName = function () {
+      return this.name;
+    };
+
+    List.prototype.setName = function (name) {
+      this.name = name;
+    };
+
+    List.prototype.getTask = function (index) {
+      if (index < 0 || index >= this.taskArr.length) {
+        return null;
+      }
+      return this.taskArr[index];
+    };
+
+    List.prototype.deleteTask = function (index) {
+      if (index < 0 || index >= this.taskArr.length) {
+        return null;
+      }
+      return this.taskArr.splice(index, 1);
+    };
+
+    List.prototype.addTask = function (task) {
+      if (task && task.verifyTask()) {
+        this.taskArr.push(task);
+      }
+    };
+
+  </script>
+</body>
+</html>
